@@ -9,7 +9,7 @@ class CustomCheckoutHandler {
     try {
       console.log('CustomCheckout: Initializing...');
       const config = /** @type {any} */ (window).customCheckoutConfig;
-      this.apiUrl = config?.apiUrl || 'https://app-for-crm-test.vercel.app/';
+      this.apiUrl = config?.apiUrl || 'https://app-for-crm-test-i04ulu00y-nazariis-projects-476aa5de.vercel.app/';
       this.enabled = config?.enabled !== false;
       console.log('CustomCheckout: API URL:', this.apiUrl);
       console.log('CustomCheckout: Enabled:', this.enabled);
