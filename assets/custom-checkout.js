@@ -7,9 +7,12 @@ class CustomCheckoutHandler {
 
   constructor() {
     try {
+      console.log('CustomCheckout: Initializing...');
       const config = /** @type {any} */ (window).customCheckoutConfig;
       this.apiUrl = config?.apiUrl || 'https://abstainedly-presageful-julissa.ngrok-free.dev/api/checkout';
       this.enabled = config?.enabled !== false;
+      console.log('CustomCheckout: API URL:', this.apiUrl);
+      console.log('CustomCheckout: Enabled:', this.enabled);
       this.init();
     } catch (error) {
       console.error('CustomCheckoutHandler initialization error:', error);
@@ -52,18 +55,27 @@ class CustomCheckoutHandler {
 
   setupFormInterception() {
     try {
+      console.log('CustomCheckout: setupFormInterception called');
       const cartForm = document.getElementById('cart-form');
+      console.log('CustomCheckout: cartForm found:', !!cartForm);
       
       if (cartForm && cartForm instanceof HTMLFormElement && !this.interceptedForms.has(cartForm)) {
+        console.log('CustomCheckout: Intercepting form submit');
         this.interceptFormSubmit(cartForm);
         this.interceptedForms.add(cartForm);
       }
       
       const checkoutButton = document.getElementById('checkout');
+      console.log('CustomCheckout: checkoutButton found:', !!checkoutButton);
+      if (checkoutButton) {
+        console.log('CustomCheckout: checkoutButton form id:', checkoutButton.form?.id);
+      }
+      
       if (checkoutButton && 
           !this.interceptedButtons.has(checkoutButton) &&
           checkoutButton instanceof HTMLButtonElement &&
           checkoutButton.form?.id === 'cart-form') {
+        console.log('CustomCheckout: Intercepting checkout button click');
         this.interceptCheckoutButton(checkoutButton);
         this.interceptedButtons.add(checkoutButton);
       }
@@ -84,12 +96,16 @@ class CustomCheckoutHandler {
       
       button.addEventListener('click', (/** @type {MouseEvent} */ e) => {
         try {
+          console.log('CustomCheckout: Checkout button clicked!');
           const form = button.form || document.getElementById('cart-form');
           if (form && form instanceof HTMLFormElement && form.id === 'cart-form') {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
+            console.log('CustomCheckout: Calling handleCheckout');
             this.handleCheckout(form);
+          } else {
+            console.log('CustomCheckout: Form not found or wrong form id');
           }
         } catch (error) {
           console.error('Error in checkout button handler:', error);
@@ -134,12 +150,15 @@ class CustomCheckoutHandler {
     try {
       form.addEventListener('submit', (e) => {
         try {
+          console.log('CustomCheckout: Form submit event');
           const submitter = e.submitter;
           const isCheckout = (submitter instanceof HTMLButtonElement && submitter.name === 'checkout') || 
                             (submitter instanceof HTMLInputElement && submitter.name === 'checkout') ||
                             submitter?.id === 'checkout';
+          console.log('CustomCheckout: Is checkout submit:', isCheckout);
 
           if (isCheckout && form.id === 'cart-form') {
+            console.log('CustomCheckout: Preventing default and calling handleCheckout');
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
@@ -155,6 +174,7 @@ class CustomCheckoutHandler {
   }
 
   async handleCheckout(/** @type {HTMLFormElement} */ form) {
+    console.log('CustomCheckout: handleCheckout called');
     const checkoutButton = form.querySelector('[name="checkout"], #checkout');
     
     if (!checkoutButton || !(checkoutButton instanceof HTMLButtonElement)) {
@@ -168,18 +188,26 @@ class CustomCheckoutHandler {
     checkoutButton.textContent = 'Processing...';
 
     try {
+      console.log('CustomCheckout: Fetching cart data...');
       const cartData = await this.fetchCartData();
+      console.log('CustomCheckout: Cart data:', cartData);
       
       if (!cartData || !cartData.items || cartData.items.length === 0) {
         throw new Error('Cart is empty');
       }
 
       const orderData = this.prepareOrderData(cartData);
+      console.log('CustomCheckout: Sending order data to:', this.apiUrl);
+      console.log('CustomCheckout: Order data:', orderData);
+      
       const response = await this.sendToAPI(orderData);
+      console.log('CustomCheckout: API response:', response);
 
       if (response && response.redirectUrl) {
+        console.log('CustomCheckout: Redirecting to:', response.redirectUrl);
         window.location.href = response.redirectUrl;
       } else {
+        console.log('CustomCheckout: No redirectUrl in response, response:', response);
         throw new Error('No redirect URL received from API');
       }
 
@@ -250,6 +278,7 @@ class CustomCheckoutHandler {
 
   async sendToAPI(/** @type {any} */ orderData) {
     try {
+      console.log('CustomCheckout: sendToAPI - URL:', this.apiUrl);
       const headers = /** @type {Record<string, string>} */ ({
         'Content-Type': 'application/json',
       });
@@ -258,20 +287,38 @@ class CustomCheckoutHandler {
         headers['ngrok-skip-browser-warning'] = 'true';
       }
       
+      console.log('CustomCheckout: Sending POST request with headers:', headers);
       const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(orderData)
       });
 
+      console.log('CustomCheckout: Response status:', response.status, response.statusText);
+      console.log('CustomCheckout: Response headers:', [...response.headers.entries()]);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorText = await response.text();
+        console.error('CustomCheckout: Error response:', errorText);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText || response.statusText };
+        }
         throw new Error(errorData.message || `API error: ${response.statusText}`);
       }
 
-      return await response.json();
+      const responseText = await response.text();
+      console.log('CustomCheckout: Response text:', responseText);
+      
+      try {
+        return JSON.parse(responseText);
+      } catch {
+        return { message: responseText };
+      }
     } catch (error) {
-      console.error('Error sending data to API:', error);
+      console.error('CustomCheckout: Error sending data to API:', error);
       
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error('Не вдалося підключитися до сервера оплати. Перевірте підключення до інтернету.');
