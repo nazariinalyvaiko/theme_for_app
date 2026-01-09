@@ -285,8 +285,10 @@ class CustomCheckoutHandler {
   async sendToAPI(/** @type {any} */ orderData) {
     try {
       console.log('CustomCheckout: sendToAPI - URL:', this.apiUrl);
+      
       const headers = /** @type {Record<string, string>} */ ({
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
       });
       
       if (this.apiUrl.includes('ngrok')) {
@@ -294,13 +296,25 @@ class CustomCheckoutHandler {
       }
       
       console.log('CustomCheckout: Sending POST request with headers:', headers);
-      const response = await fetch(this.apiUrl, {
+      console.log('CustomCheckout: Request body size:', JSON.stringify(orderData).length, 'bytes');
+      
+      const fetchOptions = {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(orderData)
-      });
+      };
+      
+      console.log('CustomCheckout: Fetch options:', fetchOptions);
+      console.log('CustomCheckout: About to call fetch...');
+      
+      const fetchPromise = fetch(this.apiUrl, fetchOptions);
+      console.log('CustomCheckout: Fetch promise created, waiting for response...');
+      
+      const response = await fetchPromise;
+      console.log('CustomCheckout: Got response!');
 
       console.log('CustomCheckout: Response status:', response.status, response.statusText);
+      console.log('CustomCheckout: Response ok:', response.ok);
       console.log('CustomCheckout: Response headers:', [...response.headers.entries()]);
 
       if (!response.ok) {
@@ -324,13 +338,34 @@ class CustomCheckoutHandler {
         return { message: responseText };
       }
     } catch (error) {
-      console.error('CustomCheckout: Error sending data to API:', error);
+      console.error('CustomCheckout: ========== ERROR DETAILS ==========');
+      console.error('CustomCheckout: Full error object:', error);
+      console.error('CustomCheckout: Error name:', error?.name);
+      console.error('CustomCheckout: Error message:', error?.message);
+      console.error('CustomCheckout: Error stack:', error?.stack);
+      console.error('CustomCheckout: API URL was:', this.apiUrl);
+      console.error('CustomCheckout: ===================================');
       
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        throw new Error('Не вдалося підключитися до сервера оплати. Перевірте підключення до інтернету.');
+      if (error instanceof TypeError) {
+        console.error('CustomCheckout: TypeError details:', {
+          message: error.message,
+          name: error.name
+        });
+        
+        const errorMsg = error.message.toLowerCase();
+        if (errorMsg.includes('fetch') || errorMsg.includes('failed to fetch') || errorMsg.includes('network') || errorMsg.includes('cors')) {
+          const detailedMsg = errorMsg.includes('cors') 
+            ? 'Помилка CORS. Перевірте налаштування CORS на сервері.'
+            : 'Не вдалося підключитися до сервера оплати. Перевірте чи працює сервер та чи правильний URL.';
+          throw new Error(detailedMsg);
+        }
       }
       
-      throw error;
+      if (error instanceof Error) {
+        throw error;
+      }
+      
+      throw new Error('Невідома помилка при відправці запиту');
     }
   }
 
