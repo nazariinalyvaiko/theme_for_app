@@ -15,165 +15,157 @@ class CustomCheckoutHandler {
    */
   enabled;
 
+  /**
+   * @type {Set<HTMLFormElement>}
+   */
+  interceptedForms = new Set();
+
+  /**
+   * @type {Set<HTMLElement>}
+   */
+  interceptedButtons = new Set();
+
+  /**
+   * @type {MutationObserver | null}
+   */
+  domObserver = null;
+
   constructor() {
-    const config = /** @type {CustomCheckoutConfig | undefined} */ (
-      // @ts-ignore
-      window.customCheckoutConfig
-    );
-    
-    this.apiUrl = config?.apiUrl || 'https://abstainedly-presageful-julissa.ngrok-free.dev/api/checkout';
-    this.enabled = config?.enabled !== false;
-    this.init();
+    try {
+      const config = /** @type {CustomCheckoutConfig | undefined} */ (
+        // @ts-ignore
+        window.customCheckoutConfig
+      );
+      
+      this.apiUrl = config?.apiUrl || 'https://abstainedly-presageful-julissa.ngrok-free.dev/api/checkout';
+      this.enabled = config?.enabled !== false;
+      this.init();
+    } catch (error) {
+      console.error('CustomCheckoutHandler initialization error:', error);
+    }
   }
 
   init() {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => this.setupFormInterception());
-    } else {
-      this.setupFormInterception();
+    try {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => this.setupFormInterception());
+      } else {
+        this.setupFormInterception();
+      }
+      
+      // Приховуємо accelerated checkout buttons від Shopify (тільки на сторінці корзини)
+      if (document.querySelector('#cart-form') || window.location.pathname.includes('/cart')) {
+        this.hideAcceleratedCheckoutButtons();
+      }
+    } catch (error) {
+      console.error('CustomCheckoutHandler init error:', error);
     }
-    
-    // Приховуємо accelerated checkout buttons від Shopify
-    this.hideAcceleratedCheckoutButtons();
-    
-    // Спостерігаємо за змінами DOM для нових елементів
-    this.observeDOM();
   }
 
   /**
-   * Приховує accelerated checkout buttons від Shopify
+   * Приховує accelerated checkout buttons від Shopify (тільки на сторінці корзини)
    */
   hideAcceleratedCheckoutButtons() {
-    const hideButtons = () => {
+    try {
       // Приховуємо accelerated checkout на сторінці корзини
       const acceleratedCheckoutCart = document.querySelector('shopify-accelerated-checkout-cart');
       if (acceleratedCheckoutCart && acceleratedCheckoutCart instanceof HTMLElement) {
         acceleratedCheckoutCart.style.display = 'none';
       }
       
-      // Приховуємо accelerated checkout на сторінці продукту
-      const acceleratedCheckoutBlocks = document.querySelectorAll('.accelerated-checkout-block, shopify-accelerated-checkout');
-      acceleratedCheckoutBlocks.forEach(block => {
-        if (block instanceof HTMLElement) {
-          block.style.display = 'none';
-        }
-      });
-      
-      // Приховуємо additional checkout buttons
-      const additionalCheckoutButtons = document.querySelectorAll('.additional-checkout-buttons, [class*="additional-checkout"]');
+      // Приховуємо additional checkout buttons тільки на сторінці корзини
+      const additionalCheckoutButtons = document.querySelectorAll('.additional-checkout-buttons');
       additionalCheckoutButtons.forEach(buttons => {
         if (buttons instanceof HTMLElement) {
           buttons.style.display = 'none';
         }
       });
-    };
-    
-    hideButtons();
-    
-    // Повторюємо після завантаження сторінки
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', hideButtons);
+    } catch (error) {
+      console.error('Error hiding accelerated checkout buttons:', error);
     }
-    
-    // Спостерігаємо за змінами
-    const observer = new MutationObserver(hideButtons);
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-  }
-
-  /**
-   * Спостерігає за змінами DOM для перехоплення нових форм
-   */
-  observeDOM() {
-    const observer = new MutationObserver(() => {
-      this.setupFormInterception();
-      this.hideAcceleratedCheckoutButtons();
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
   }
 
   setupFormInterception() {
-    // Перехоплюємо всі форми, не тільки cart-form
-    const allForms = document.querySelectorAll('form');
-    allForms.forEach(form => {
-      const formElement = /** @type {HTMLFormElement} */ (form);
-      // Перевіряємо чи це форма корзини або форма з кнопкою checkout
-      const hasCheckoutButton = formElement.querySelector('[name="checkout"], #checkout, [id*="checkout"]');
-      if (hasCheckoutButton || formElement.id === 'cart-form') {
-        this.interceptFormSubmit(formElement);
+    try {
+      // Перехоплюємо ТІЛЬКИ форму корзини
+      const cartForm = /** @type {HTMLFormElement | null} */ (document.getElementById('cart-form'));
+      
+      if (cartForm && !this.interceptedForms.has(cartForm)) {
+        this.interceptFormSubmit(cartForm);
+        this.interceptedForms.add(cartForm);
       }
-    });
-    
-    // Також перехоплюємо прямі кліки на кнопки checkout
-    this.interceptCheckoutButtons();
+      
+      // Перехоплюємо кнопку checkout тільки якщо вона в формі корзини
+      const checkoutButton = document.getElementById('checkout');
+      if (checkoutButton && 
+          !this.interceptedButtons.has(checkoutButton) &&
+          checkoutButton instanceof HTMLButtonElement &&
+          checkoutButton.form?.id === 'cart-form') {
+        this.interceptCheckoutButton(checkoutButton);
+        this.interceptedButtons.add(checkoutButton);
+      }
+    } catch (error) {
+      console.error('Error setting up form interception:', error);
+    }
   }
 
   /**
-   * Перехоплює прямі кліки на кнопки checkout
+   * Перехоплює клік на кнопку checkout
+   * @param {HTMLButtonElement} button - Кнопка checkout
    */
-  interceptCheckoutButtons() {
-    const checkoutButtons = document.querySelectorAll('[name="checkout"], #checkout, [id*="checkout"], button[form*="cart"]');
-    checkoutButtons.forEach(button => {
-      const buttonElement = /** @type {HTMLButtonElement} */ (button);
-      // Перевіряємо чи це дійсно кнопка checkout
-      if (buttonElement.name === 'checkout' || 
-          buttonElement.id === 'checkout' || 
-          buttonElement.textContent?.toLowerCase().includes('checkout') ||
-          buttonElement.textContent?.toLowerCase().includes('оплата')) {
-        // Видаляємо старі обробники
-        const newButton = buttonElement.cloneNode(true);
-        buttonElement.parentNode?.replaceChild(newButton, buttonElement);
-        
-        // Додаємо новий обробник
-        newButton.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          const form = /** @type {HTMLFormElement | null} */ (
-            document.getElementById('cart-form') || 
-            (newButton instanceof Element ? newButton.closest('form') : null) ||
-            document.querySelector('form[action*="cart"]')
-          );
-          
-          if (form) {
+  interceptCheckoutButton(button) {
+    try {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      
+      // Додаємо обробник тільки якщо кнопка в формі корзини
+      if (button.form?.id !== 'cart-form') {
+        return;
+      }
+      
+      button.addEventListener('click', (e) => {
+        try {
+          const form = button.form || document.getElementById('cart-form');
+          if (form && form instanceof HTMLFormElement && form.id === 'cart-form') {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
             this.handleCheckout(form);
           }
-        }, { capture: true });
-      }
-    });
+        } catch (error) {
+          console.error('Error in checkout button handler:', error);
+        }
+      }, { capture: true, once: false });
+    } catch (error) {
+      console.error('Error intercepting checkout button:', error);
+    }
   }
 
   waitForCartForm() {
-    const observer = new MutationObserver((mutations, obs) => {
-      const cartForm = /** @type {HTMLFormElement | null} */ (document.getElementById('cart-form'));
-      if (cartForm) {
-        this.interceptFormSubmit(cartForm);
-        this.interceptCheckoutButtons();
-        obs.disconnect();
-      }
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-
-    const checkoutButton = document.getElementById('checkout');
-    if (checkoutButton) {
-      checkoutButton.addEventListener('click', (e) => {
-        const form = /** @type {HTMLFormElement | null} */ (document.getElementById('cart-form'));
-        if (form) {
-          e.preventDefault();
-          e.stopPropagation();
-          this.handleCheckout(form);
+    try {
+      const observer = new MutationObserver((mutations, obs) => {
+        try {
+          const cartForm = /** @type {HTMLFormElement | null} */ (document.getElementById('cart-form'));
+          if (cartForm && !this.interceptedForms.has(cartForm)) {
+            this.interceptFormSubmit(cartForm);
+            this.interceptedForms.add(cartForm);
+            obs.disconnect();
+          }
+        } catch (error) {
+          console.error('Error in waitForCartForm observer:', error);
         }
-      }, { capture: true });
+      });
+
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+
+      // Відключаємо спостерігач через 10 секунд щоб не було зациклення
+      setTimeout(() => observer.disconnect(), 10000);
+    } catch (error) {
+      console.error('Error in waitForCartForm:', error);
     }
   }
 
@@ -181,22 +173,30 @@ class CustomCheckoutHandler {
    * @param {HTMLFormElement} form - Форма корзини
    */
   interceptFormSubmit(form) {
-    if (!this.enabled) {
+    if (!this.enabled || form.id !== 'cart-form') {
       return;
     }
 
-    form.addEventListener('submit', (e) => {
-      const submitter = /** @type {HTMLButtonElement | HTMLInputElement | null} */ (e.submitter);
-      const isCheckout = submitter?.name === 'checkout' || 
-                        submitter?.id === 'checkout' ||
-                        submitter?.form?.querySelector('[name="checkout"]');
+    try {
+      form.addEventListener('submit', (e) => {
+        try {
+          const submitter = /** @type {HTMLButtonElement | HTMLInputElement | null} */ (e.submitter);
+          const isCheckout = submitter?.name === 'checkout' || 
+                            submitter?.id === 'checkout';
 
-      if (isCheckout) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.handleCheckout(form);
-      }
-    });
+          if (isCheckout && form.id === 'cart-form') {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            this.handleCheckout(form);
+          }
+        } catch (error) {
+          console.error('Error in form submit handler:', error);
+        }
+      }, { capture: true });
+    } catch (error) {
+      console.error('Error intercepting form submit:', error);
+    }
   }
 
   /**
@@ -401,14 +401,37 @@ class CustomCheckoutHandler {
 }
 
 if (typeof window !== 'undefined') {
-  // @ts-ignore
-  if (!window.customCheckoutConfig) {
+  try {
     // @ts-ignore
-    window.customCheckoutConfig = {
-      enabled: true,
-      apiUrl: 'https://abstainedly-presageful-julissa.ngrok-free.dev/api/checkout'
-    };
-  }
+    if (!window.customCheckoutConfig) {
+      // @ts-ignore
+      window.customCheckoutConfig = {
+        enabled: true,
+        apiUrl: 'https://abstainedly-presageful-julissa.ngrok-free.dev/api/checkout'
+      };
+    }
 
-  new CustomCheckoutHandler();
+    // Затримка ініціалізації щоб не конфліктувати з Shopify
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+          try {
+            new CustomCheckoutHandler();
+          } catch (error) {
+            console.error('Failed to initialize CustomCheckoutHandler:', error);
+          }
+        }, 100);
+      });
+    } else {
+      setTimeout(() => {
+        try {
+          new CustomCheckoutHandler();
+        } catch (error) {
+          console.error('Failed to initialize CustomCheckoutHandler:', error);
+        }
+      }, 100);
+    }
+  } catch (error) {
+    console.error('Error initializing custom checkout:', error);
+  }
 }

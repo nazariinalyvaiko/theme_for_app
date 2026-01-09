@@ -1530,18 +1530,17 @@ button.shopify-payment-button__button--unbranded:hover:not([disabled]) {
   text-align: center;
 }
 
-shopify-accelerated-checkout,
-shopify-accelerated-checkout-cart {
+/* Приховуємо accelerated checkout buttons тільки на сторінці корзини */
+body:has(#cart-form) shopify-accelerated-checkout,
+body:has(#cart-form) shopify-accelerated-checkout-cart,
+body:has(#cart-form) .additional-checkout-buttons {
   display: none !important;
-  --shopify-accelerated-checkout-button-border-radius: var(--style-border-radius-buttons-primary);
-  --shopify-accelerated-checkout-button-block-size: var(--height-buy-buttons);
 }
 
-/* Приховуємо accelerated checkout buttons - використовуємо власний checkout */
-.accelerated-checkout-block,
-.additional-checkout-buttons,
-[class*="additional-checkout"] {
-  display: none !important;
+shopify-accelerated-checkout,
+shopify-accelerated-checkout-cart {
+  --shopify-accelerated-checkout-button-border-radius: var(--style-border-radius-buttons-primary);
+  --shopify-accelerated-checkout-button-block-size: var(--height-buy-buttons);
 }
 
 .product-form-buttons:has(.add-to-cart-button.button-secondary)
