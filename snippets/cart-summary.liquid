@@ -288,6 +288,15 @@
 </div>
 
 {% stylesheet %}
+  /* Приховуємо accelerated checkout buttons від Shopify */
+  shopify-accelerated-checkout,
+  shopify-accelerated-checkout-cart,
+  .accelerated-checkout-block,
+  .additional-checkout-buttons,
+  [class*="additional-checkout"] {
+    display: none !important;
+  }
+
   .cart-actions {
     display: flex;
     flex-direction: column;

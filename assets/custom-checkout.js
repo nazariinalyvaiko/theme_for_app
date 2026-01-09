@@ -32,17 +32,121 @@ class CustomCheckoutHandler {
     } else {
       this.setupFormInterception();
     }
+    
+    // Приховуємо accelerated checkout buttons від Shopify
+    this.hideAcceleratedCheckoutButtons();
+    
+    // Спостерігаємо за змінами DOM для нових елементів
+    this.observeDOM();
+  }
+
+  /**
+   * Приховує accelerated checkout buttons від Shopify
+   */
+  hideAcceleratedCheckoutButtons() {
+    const hideButtons = () => {
+      // Приховуємо accelerated checkout на сторінці корзини
+      const acceleratedCheckoutCart = document.querySelector('shopify-accelerated-checkout-cart');
+      if (acceleratedCheckoutCart && acceleratedCheckoutCart instanceof HTMLElement) {
+        acceleratedCheckoutCart.style.display = 'none';
+      }
+      
+      // Приховуємо accelerated checkout на сторінці продукту
+      const acceleratedCheckoutBlocks = document.querySelectorAll('.accelerated-checkout-block, shopify-accelerated-checkout');
+      acceleratedCheckoutBlocks.forEach(block => {
+        if (block instanceof HTMLElement) {
+          block.style.display = 'none';
+        }
+      });
+      
+      // Приховуємо additional checkout buttons
+      const additionalCheckoutButtons = document.querySelectorAll('.additional-checkout-buttons, [class*="additional-checkout"]');
+      additionalCheckoutButtons.forEach(buttons => {
+        if (buttons instanceof HTMLElement) {
+          buttons.style.display = 'none';
+        }
+      });
+    };
+    
+    hideButtons();
+    
+    // Повторюємо після завантаження сторінки
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', hideButtons);
+    }
+    
+    // Спостерігаємо за змінами
+    const observer = new MutationObserver(hideButtons);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  /**
+   * Спостерігає за змінами DOM для перехоплення нових форм
+   */
+  observeDOM() {
+    const observer = new MutationObserver(() => {
+      this.setupFormInterception();
+      this.hideAcceleratedCheckoutButtons();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
   }
 
   setupFormInterception() {
-    const cartForm = /** @type {HTMLFormElement | null} */ (document.getElementById('cart-form'));
+    // Перехоплюємо всі форми, не тільки cart-form
+    const allForms = document.querySelectorAll('form');
+    allForms.forEach(form => {
+      const formElement = /** @type {HTMLFormElement} */ (form);
+      // Перевіряємо чи це форма корзини або форма з кнопкою checkout
+      const hasCheckoutButton = formElement.querySelector('[name="checkout"], #checkout, [id*="checkout"]');
+      if (hasCheckoutButton || formElement.id === 'cart-form') {
+        this.interceptFormSubmit(formElement);
+      }
+    });
     
-    if (!cartForm) {
-      this.waitForCartForm();
-      return;
-    }
+    // Також перехоплюємо прямі кліки на кнопки checkout
+    this.interceptCheckoutButtons();
+  }
 
-    this.interceptFormSubmit(cartForm);
+  /**
+   * Перехоплює прямі кліки на кнопки checkout
+   */
+  interceptCheckoutButtons() {
+    const checkoutButtons = document.querySelectorAll('[name="checkout"], #checkout, [id*="checkout"], button[form*="cart"]');
+    checkoutButtons.forEach(button => {
+      const buttonElement = /** @type {HTMLButtonElement} */ (button);
+      // Перевіряємо чи це дійсно кнопка checkout
+      if (buttonElement.name === 'checkout' || 
+          buttonElement.id === 'checkout' || 
+          buttonElement.textContent?.toLowerCase().includes('checkout') ||
+          buttonElement.textContent?.toLowerCase().includes('оплата')) {
+        // Видаляємо старі обробники
+        const newButton = buttonElement.cloneNode(true);
+        buttonElement.parentNode?.replaceChild(newButton, buttonElement);
+        
+        // Додаємо новий обробник
+        newButton.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const form = /** @type {HTMLFormElement | null} */ (
+            document.getElementById('cart-form') || 
+            (newButton instanceof Element ? newButton.closest('form') : null) ||
+            document.querySelector('form[action*="cart"]')
+          );
+          
+          if (form) {
+            this.handleCheckout(form);
+          }
+        }, { capture: true });
+      }
+    });
   }
 
   waitForCartForm() {
@@ -50,6 +154,7 @@ class CustomCheckoutHandler {
       const cartForm = /** @type {HTMLFormElement | null} */ (document.getElementById('cart-form'));
       if (cartForm) {
         this.interceptFormSubmit(cartForm);
+        this.interceptCheckoutButtons();
         obs.disconnect();
       }
     });
@@ -68,7 +173,7 @@ class CustomCheckoutHandler {
           e.stopPropagation();
           this.handleCheckout(form);
         }
-      });
+      }, { capture: true });
     }
   }
 
@@ -205,11 +310,19 @@ class CustomCheckoutHandler {
    */
   async sendToAPI(orderData) {
     try {
+      // Додаємо заголовки для ngrok якщо потрібно
+      const headers = /** @type {Record<string, string>} */ ({
+        'Content-Type': 'application/json',
+      });
+      
+      // Якщо це ngrok URL, додаємо необхідні заголовки
+      if (this.apiUrl.includes('ngrok')) {
+        headers['ngrok-skip-browser-warning'] = 'true';
+      }
+      
       const response = await fetch(this.apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: JSON.stringify(orderData)
       });
 
@@ -221,6 +334,12 @@ class CustomCheckoutHandler {
       return await response.json();
     } catch (error) {
       console.error('Error sending data to API:', error);
+      
+      // Якщо помилка мережі, показуємо більш зрозуміле повідомлення
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('Не вдалося підключитися до сервера оплати. Перевірте підключення до інтернету.');
+      }
+      
       throw error;
     }
   }

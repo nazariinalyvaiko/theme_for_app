@@ -1532,8 +1532,16 @@ button.shopify-payment-button__button--unbranded:hover:not([disabled]) {
 
 shopify-accelerated-checkout,
 shopify-accelerated-checkout-cart {
+  display: none !important;
   --shopify-accelerated-checkout-button-border-radius: var(--style-border-radius-buttons-primary);
   --shopify-accelerated-checkout-button-block-size: var(--height-buy-buttons);
+}
+
+/* Приховуємо accelerated checkout buttons - використовуємо власний checkout */
+.accelerated-checkout-block,
+.additional-checkout-buttons,
+[class*="additional-checkout"] {
+  display: none !important;
 }
 
 .product-form-buttons:has(.add-to-cart-button.button-secondary)
