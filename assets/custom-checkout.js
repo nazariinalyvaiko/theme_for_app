@@ -9,7 +9,7 @@ class CustomCheckoutHandler {
     try {
       console.log('CustomCheckout: Initializing...');
       const config = /** @type {any} */ (window).customCheckoutConfig;
-      this.apiUrl = config?.apiUrl || 'https://abstainedly-presageful-julissa.ngrok-free.dev/api/checkout';
+      this.apiUrl = config?.apiUrl || 'https://app-for-crm-test.vercel.app/';
       this.enabled = config?.enabled !== false;
       console.log('CustomCheckout: API URL:', this.apiUrl);
       console.log('CustomCheckout: Enabled:', this.enabled);
