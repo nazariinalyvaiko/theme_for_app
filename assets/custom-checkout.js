@@ -67,14 +67,15 @@ class CustomCheckoutHandler {
       
       const checkoutButton = document.getElementById('checkout');
       console.log('CustomCheckout: checkoutButton found:', !!checkoutButton);
-      if (checkoutButton) {
+      if (checkoutButton && checkoutButton instanceof HTMLButtonElement) {
         console.log('CustomCheckout: checkoutButton form id:', checkoutButton.form?.id);
+        console.log('CustomCheckout: checkoutButton form attribute:', checkoutButton.getAttribute('form'));
       }
       
       if (checkoutButton && 
           !this.interceptedButtons.has(checkoutButton) &&
           checkoutButton instanceof HTMLButtonElement &&
-          checkoutButton.form?.id === 'cart-form') {
+          (checkoutButton.form?.id === 'cart-form' || checkoutButton.getAttribute('form') === 'cart-form')) {
         console.log('CustomCheckout: Intercepting checkout button click');
         this.interceptCheckoutButton(checkoutButton);
         this.interceptedButtons.add(checkoutButton);
@@ -90,7 +91,8 @@ class CustomCheckoutHandler {
         return;
       }
       
-      if (button.form?.id !== 'cart-form') {
+      const formId = button.form?.id || button.getAttribute('form');
+      if (formId !== 'cart-form') {
         return;
       }
       
@@ -175,7 +177,11 @@ class CustomCheckoutHandler {
 
   async handleCheckout(/** @type {HTMLFormElement} */ form) {
     console.log('CustomCheckout: handleCheckout called');
-    const checkoutButton = form.querySelector('[name="checkout"], #checkout');
+    let checkoutButton = form.querySelector('[name="checkout"], #checkout');
+    
+    if (!checkoutButton) {
+      checkoutButton = document.getElementById('checkout') || document.querySelector('[name="checkout"]');
+    }
     
     if (!checkoutButton || !(checkoutButton instanceof HTMLButtonElement)) {
       console.error('Checkout button not found');
