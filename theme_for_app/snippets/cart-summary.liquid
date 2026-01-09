@@ -4,7 +4,6 @@
   @param {string} [accelerated_checkout_buttons_layout] - { 'vertical' } Forced layout of the additional checkout buttons, instead of relying on platform's layout.
 {%- enddoc -%}
 
-{%- comment -%} Custom Checkout Handler - перехоплює submit форми корзини {%- endcomment -%}
 <script
   src="{{ 'custom-checkout.js' | asset_url }}"
   type="module"
@@ -110,7 +109,6 @@
 
           assign discount_codes = discount_codes | uniq
 
-          # Evaluate the boolean expression for the disclosure state
           if discount_codes.size == 0
             assign disclosure_expanded = false
           else
@@ -245,7 +243,6 @@
         ref="cartTotal"
         value="{{ total_price | strip_html }}"
         class="cart__total-value cart-secondary-typography"
-        {% comment %} Used by payment_terms web component {% endcomment %}
         data-cart-subtotal
       >
         {{ total_price }}
