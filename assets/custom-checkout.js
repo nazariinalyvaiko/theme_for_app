@@ -74,6 +74,31 @@ class CustomCheckoutHandler {
     }, { capture: true });
   }
 
+  prepareOrderData(/** @type {any} */ cartData) {
+    return {
+      line_items: cartData.items.map((/** @type {any} */ item) => ({
+        variant_id: item.variant_id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        title: item.product_title,
+        variant_title: item.variant_title || '',
+        price: item.price,
+        sku: item.sku || '',
+        vendor: item.vendor || '',
+        properties: item.properties || [],
+        image: item.image || '',
+        url: item.url || ''
+      })),
+      total_price: cartData.total_price,
+      subtotal_price: cartData.original_total_price,
+      total_discount: cartData.total_discount || 0,
+      item_count: cartData.item_count,
+      currency: cartData.currency,
+      note: cartData.note || '',
+      attributes: cartData.attributes || {}
+    };
+  }
+
   async handleCheckout() {
     const checkoutButton = document.getElementById('checkout');
     if (!(checkoutButton instanceof HTMLButtonElement)) return;
@@ -89,28 +114,39 @@ class CustomCheckoutHandler {
         throw new Error('Cart is empty');
       }
 
+      const orderData = this.prepareOrderData(cartData);
+
       const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cartData)
+        body: JSON.stringify(orderData)
+      }).catch(fetchError => {
+        console.error('Fetch error:', fetchError);
+        if (fetchError.message.includes('NetworkError') || fetchError.message.includes('Failed to fetch')) {
+          throw new Error('Не вдалося підключитися до сервера. Перевірте чи працює сервер та налаштування CORS.');
+        }
+        throw fetchError;
       });
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.statusText}`);
+        const errorText = await response.text().catch(() => response.statusText);
+        throw new Error(`Помилка сервера: ${response.status} ${errorText}`);
       }
 
       const data = await response.json();
       if (data.redirectUrl) {
         window.location.href = data.redirectUrl;
       } else {
-        throw new Error('No redirect URL received');
+        throw new Error('Сервер не повернув URL для перенаправлення');
       }
 
     } catch (error) {
       console.error('Checkout error:', error);
       checkoutButton.disabled = false;
       checkoutButton.textContent = originalText;
-      alert(error instanceof Error ? error.message : 'An error occurred');
+      
+      const errorMessage = error instanceof Error ? error.message : 'Сталася помилка. Спробуйте ще раз.';
+      alert(errorMessage);
     }
   }
 }
