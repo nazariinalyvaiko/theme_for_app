@@ -423,7 +423,7 @@ if (typeof window !== 'undefined') {
     if (!win.customCheckoutConfig) {
       win.customCheckoutConfig = {
         enabled: true,
-        apiUrl: 'https://abstainedly-presageful-julissa.ngrok-free.dev/api/checkout'
+        apiUrl: 'https://app-for-crm-test-ohbnr4mcv-nazariis-projects-476aa5de.vercel.app/api/checkout'
       };
     }
 
