@@ -1,4 +1,4 @@
-const DEFAULT_API_URL = 'https://app-for-crm-test-ohbnr4mcv-nazariis-projects-476aa5de.vercel.app/api/checkout';
+const DEFAULT_API_URL = 'https://abstainedly-presageful-j/api/checkout';
 
 class CustomCheckoutHandler {
   apiUrl;
