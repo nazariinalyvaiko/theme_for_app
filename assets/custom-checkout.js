@@ -1,4 +1,4 @@
-const DEFAULT_API_URL = 'https://abstainedly-presageful-j/api/checkout';
+const DEFAULT_API_URL = 'https://abstainedly-presageful-julissa.ngrok-free.dev/api/checkout';
 
 class CustomCheckoutHandler {
   apiUrl;
